@@ -1,11 +1,6 @@
 pipeline {
     agent any
     
-    // เพิ่มส่วนนี้เพื่อให้ Jenkins ไปดึง Java 21 มาใช้รันสเตจต่างๆ
-    tools {
-        jdk 'jdk21' 
-    }
-
     parameters {
         // แนะนำให้ใส่คำอธิบายชัดเจนว่าถ้าเป็น Tag ให้ใส่ชื่อ Tag เลย
         string(name: 'GIT_TAG', defaultValue: 'main', description: 'ระบุชื่อ Tag (เช่น v1.0.0) หรือ Branch (เช่น main)')
@@ -18,12 +13,6 @@ pipeline {
     }
 
     stages {
-        stage('Check Environment') {
-            steps {
-                sh 'java -version'
-                sh 'ls -l' // ดูว่าเห็นไฟล์ mvnw ในโฟลเดอร์ไหม
-            }
-        }
 
         stage('Checkout') {
             steps {
