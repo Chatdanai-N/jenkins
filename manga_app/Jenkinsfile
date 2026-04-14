@@ -1,9 +1,9 @@
 pipeline {
     agent any
     
-    // ตั้งค่า Parameters เพื่อให้เลือก Tag ได้
     parameters {
-        string(name: 'GIT_TAG', defaultValue: 'main', description: 'ระบุชื่อ Tag หรือ Branch')
+        // แนะนำให้ใส่คำอธิบายชัดเจนว่าถ้าเป็น Tag ให้ใส่ชื่อ Tag เลย
+        string(name: 'GIT_TAG', defaultValue: 'main', description: 'ระบุชื่อ Tag (เช่น v1.0.0) หรือ Branch (เช่น main)')
     }
 
     environment {
@@ -15,21 +15,31 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                // เปลี่ยน URL เป็นของโปรเจกต์คุณจริงๆ
-                git url: 'https://github.com/your-user/manga_app.git', branch: params.GIT_TAG
+                script {
+                    // ใช้ checkout scm เพื่อให้รองรับทั้ง Branch และ Tag อย่างละเอียด
+                    checkout([$class: 'GitSCM', 
+                        branches: [[name: "refs/tags/${params.GIT_TAG}"]], 
+                        userRemoteConfigs: [[
+                            url: 'https://github.com/Chatdanai-N/manga_app.git',
+                            credentialsId: 'github-Chatdanai-N' // ใช้ ID ที่คุณตั้งไว้ใน Jenkins Credentials
+                        ]],
+                        doGenerateSubmoduleConfigurations: false,
+                        extensions: [],
+                        submoduleCfg: []
+                    ])
+                }
             }
         }
 
         stage('Build & Test') {
             steps {
-                // รัน Maven build ผ่าน wrapper ในโปรเจกต์
-                sh './mvnw clean package'
+                // เพิ่มการรัน Unit Test และ Scan ตามที่คุณเน้นเรื่อง Code Quality
+                sh './mvnw clean package -DskipTests=false'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                // สร้าง Image ตาม Dockerfile ที่เตรียมไว้
                 sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
             }
@@ -38,7 +48,6 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    // หยุดตัวเก่าและรันตัวใหม่ใน dev-network
                     sh "docker stop ${DOCKER_CONTAINER_NAME} || true"
                     sh "docker rm ${DOCKER_CONTAINER_NAME} || true"
                     sh """
