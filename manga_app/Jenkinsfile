@@ -36,10 +36,10 @@ pipeline {
 
         stage('Build & Test') {
             steps {
-                dir("${env.APP_DIR}") {
-                    // ใช้ mvn จาก tools ที่ประกาศไว้
-                    sh 'mvn clean package -DskipTests=false'
-                }
+                
+                // ใช้ mvn จาก tools ที่ประกาศไว้
+                sh 'mvn clean package -DskipTests=false'
+                
             }
         }
 
