@@ -30,6 +30,21 @@ pipeline {
             }
         }
 
+        stage('Dependency Check Scan') {
+            steps {
+                echo '🔍 Scanning dependencies for vulnerabilities...'
+                // รันเฉพาะการ Scan โดยยังไม่ Build ตัวแอป
+                // -DskipTests เพื่อความรวดเร็ว
+                sh 'mvn org.owasp:dependency-check-maven:check -DskipTests'
+            }
+            post {
+                always {
+                    // เก็บไฟล์ Report ไว้ดูบน Jenkins (ไฟล์จะอยู่ที่ target/dependency-check-report.html)
+                    archiveArtifacts artifacts: 'target/dependency-check-report.html', fingerprint: true
+                }
+            }
+        }
+
         stage('Build & Test') {
             steps {
                 sh 'mvn clean package -DskipTests=false'
