@@ -49,6 +49,9 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
+
+                    sh "docker network create dev-network || true"
+
                     sh "docker stop ${DOCKER_CONTAINER_NAME} || true"
                     sh "docker rm ${DOCKER_CONTAINER_NAME} || true"
                     sh """
