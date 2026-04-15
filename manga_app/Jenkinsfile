@@ -32,15 +32,12 @@ pipeline {
 
         stage('Build & Test') {
             steps {
-                // รันที่ Root เพราะ pom.xml อยู่ที่นี่
                 sh 'mvn clean package -DskipTests=false'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                // แก้ไข: ใช้ . (จุด) แทนการระบุชื่อโฟลเดอร์ซ้ำซ้อน
-                // เพราะ Dockerfile และไฟล์ที่ Build เสร็จแล้วอยู่ที่ Root นี้เลย
                 sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
             }
@@ -49,16 +46,20 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-
+                    // สร้าง network หากยังไม่มี
                     sh "docker network create dev-network || true"
 
+                    // หยุดและลบคอนเทนเนอร์เก่า
                     sh "docker stop ${DOCKER_CONTAINER_NAME} || true"
                     sh "docker rm ${DOCKER_CONTAINER_NAME} || true"
+                    
+                    // รันคอนเทนเนอร์ใหม่ พร้อมระบุ Profile 'dev'
                     sh """
                         docker run -d \
                         --name ${DOCKER_CONTAINER_NAME} \
                         --network dev-network \
                         -p 8081:8080 \
+                        -e "SPRING_PROFILES_ACTIVE=dev" \
                         ${IMAGE_NAME}:latest
                     """
                 }
