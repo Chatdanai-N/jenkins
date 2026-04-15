@@ -1,32 +1,34 @@
 pipeline {
     agent any
     
+    tools {
+        // ต้องมั่นใจว่าใน Jenkins Global Tool Configuration ตั้งชื่อว่า 'maven3' ตรงกัน
+        maven 'maven3'
+    }
+
     parameters {
-        // แนะนำให้ใส่คำอธิบายชัดเจนว่าถ้าเป็น Tag ให้ใส่ชื่อ Tag เลย
-        string(name: 'GIT_TAG', defaultValue: 'main', description: 'ระบุชื่อ Tag (เช่น v1.0.0) หรือ Branch (เช่น main)')
+        string(name: 'GIT_TAG', defaultValue: 'main', description: 'ระบุชื่อ Tag หรือ Branch')
     }
 
     environment {
         IMAGE_NAME = "manga_app"
         IMAGE_TAG = "${params.GIT_TAG}-${env.BUILD_ID}"
         DOCKER_CONTAINER_NAME = "manga-app-container"
+        // กำหนดโฟลเดอร์งานเพื่อความแม่นยำ
+        APP_DIR = "manga_app" 
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 script {
-                    // ใช้ checkout scm เพื่อให้รองรับทั้ง Branch และ Tag อย่างละเอียด
+                    // ปรับ Checkout ให้รองรับทั้ง Branch และ Tag ได้ยืดหยุ่นขึ้น
                     checkout([$class: 'GitSCM', 
-                        branches: [[name: "refs/tags/${params.GIT_TAG}"]], 
+                        branches: [[name: "${params.GIT_TAG}"]], 
                         userRemoteConfigs: [[
                             url: 'https://github.com/Chatdanai-N/manga_app.git',
-                            credentialsId: 'github-Chatdanai-N' // ใช้ ID ที่คุณตั้งไว้ใน Jenkins Credentials
-                        ]],
-                        doGenerateSubmoduleConfigurations: false,
-                        extensions: [],
-                        submoduleCfg: []
+                            credentialsId: 'github-Chatdanai-N'
+                        ]]
                     ])
                 }
             }
@@ -34,16 +36,18 @@ pipeline {
 
         stage('Build & Test') {
             steps {
-                // เพิ่มการรัน Unit Test และ Scan ตามที่คุณเน้นเรื่อง Code Quality
-                // ให้สิทธิ์การรันกับไฟล์ mvnw ก่อน
-                sh 'chmod +x mvnw'
-                sh './mvnw clean package -DskipTests=false'
+                dir("${env.APP_DIR}") {
+                    // ใช้ mvn จาก tools ที่ประกาศไว้
+                    sh 'mvn clean package -DskipTests=false'
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                // ย้ายออกมาที่ Root (ที่ที่มี Dockerfile) 
+                // หรือระบุ Path ของ Dockerfile ให้ถูกต้อง
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f ${env.APP_DIR}/Dockerfile ${env.APP_DIR}"
                 sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
             }
         }
@@ -51,6 +55,7 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
+                    // ป้องกัน Error กรณีไม่มี Container อยู่ก่อน
                     sh "docker stop ${DOCKER_CONTAINER_NAME} || true"
                     sh "docker rm ${DOCKER_CONTAINER_NAME} || true"
                     sh """
@@ -62,6 +67,13 @@ pipeline {
                     """
                 }
             }
+        }
+    }
+    
+    post {
+        always {
+            // เคลียร์ไฟล์หลังจบงานเพื่อประหยัดพื้นที่ Disk บน Jenkins
+            cleanWs()
         }
     }
 }
