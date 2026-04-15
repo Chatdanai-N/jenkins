@@ -2,7 +2,6 @@ pipeline {
     agent any
     
     tools {
-        // ต้องมั่นใจว่าใน Jenkins Global Tool Configuration ตั้งชื่อว่า 'maven3' ตรงกัน
         maven 'maven3'
     }
 
@@ -14,15 +13,12 @@ pipeline {
         IMAGE_NAME = "manga_app"
         IMAGE_TAG = "${params.GIT_TAG}-${env.BUILD_ID}"
         DOCKER_CONTAINER_NAME = "manga-app-container"
-        // กำหนดโฟลเดอร์งานเพื่อความแม่นยำ
-        APP_DIR = "manga_app" 
     }
 
     stages {
         stage('Checkout') {
             steps {
                 script {
-                    // ปรับ Checkout ให้รองรับทั้ง Branch และ Tag ได้ยืดหยุ่นขึ้น
                     checkout([$class: 'GitSCM', 
                         branches: [[name: "${params.GIT_TAG}"]], 
                         userRemoteConfigs: [[
@@ -36,18 +32,16 @@ pipeline {
 
         stage('Build & Test') {
             steps {
-                
-                // ใช้ mvn จาก tools ที่ประกาศไว้
+                // รันที่ Root เพราะ pom.xml อยู่ที่นี่
                 sh 'mvn clean package -DskipTests=false'
-                
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                // ย้ายออกมาที่ Root (ที่ที่มี Dockerfile) 
-                // หรือระบุ Path ของ Dockerfile ให้ถูกต้อง
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f ${env.APP_DIR}/Dockerfile ${env.APP_DIR}"
+                // แก้ไข: ใช้ . (จุด) แทนการระบุชื่อโฟลเดอร์ซ้ำซ้อน
+                // เพราะ Dockerfile และไฟล์ที่ Build เสร็จแล้วอยู่ที่ Root นี้เลย
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
             }
         }
@@ -55,7 +49,6 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    // ป้องกัน Error กรณีไม่มี Container อยู่ก่อน
                     sh "docker stop ${DOCKER_CONTAINER_NAME} || true"
                     sh "docker rm ${DOCKER_CONTAINER_NAME} || true"
                     sh """
@@ -72,7 +65,6 @@ pipeline {
     
     post {
         always {
-            // เคลียร์ไฟล์หลังจบงานเพื่อประหยัดพื้นที่ Disk บน Jenkins
             cleanWs()
         }
     }
